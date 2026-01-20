@@ -9,19 +9,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// MongoDB connection
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB Connected"))
-  .catch(err => console.error(err));
-
-// ROUTES FIRST 👇
-
-// health check
+// ROUTES
 app.get("/", (req, res) => {
   res.send("Event Registration Backend Running");
 });
 
-// CREATE
 app.post("/register", async (req, res) => {
   try {
     const { name, email, phone, college, event } = req.body;
@@ -35,23 +27,31 @@ app.post("/register", async (req, res) => {
     res.status(201).json({ message: "Registration successful" });
 
   } catch (err) {
-    console.error(err);
+    console.error("REGISTER ERROR:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-// READ
 app.get("/registrations", async (req, res) => {
   try {
-    const registrations = await Registration.find();
+    const registrations = await Registration.find().sort({ createdAt: -1 });
     res.json(registrations);
   } catch (err) {
-    console.error(err);
+    console.error("FETCH ERROR:", err);
     res.status(500).json({ message: "Failed to fetch registrations" });
   }
 });
 
-// CSV
+app.delete("/registrations/:id", async (req, res) => {
+  try {
+    await Registration.findByIdAndDelete(req.params.id);
+    res.json({ message: "Registration deleted" });
+  } catch (err) {
+    console.error("DELETE ERROR:", err);
+    res.status(500).json({ message: "Delete failed" });
+  }
+});
+
 app.get("/registrations/csv", async (req, res) => {
   try {
     const registrations = await Registration.find();
@@ -66,24 +66,25 @@ app.get("/registrations/csv", async (req, res) => {
     res.send(csv);
 
   } catch (err) {
-    console.error(err);
+    console.error("CSV ERROR:", err);
     res.status(500).send("Failed to generate CSV");
   }
 });
 
-// DELETE
-app.delete("/registrations/:id", async (req, res) => {
-  try {
-    await Registration.findByIdAndDelete(req.params.id);
-    res.json({ message: "Registration deleted" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Delete failed" });
-  }
-});
-
-// LISTEN LAST 👇
+// 🚀 START SERVER ONLY AFTER DB CONNECTS
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+
+async function startServer() {
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("MongoDB Connected");
+
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error("DB CONNECTION FAILED:", err);
+  }
+}
+
+startServer();
