@@ -5,6 +5,9 @@ document
   .addEventListener("submit", async function (e) {
     e.preventDefault();
 
+    const messageEl = document.getElementById("message");
+    messageEl.innerText = "Submitting...";
+
     const data = {
       name: document.getElementById("name").value,
       email: document.getElementById("email").value,
@@ -21,13 +24,22 @@ document
       });
 
       const result = await response.json();
-      document.getElementById("message").innerText = result.message;
 
+      // ✅ SUCCESS
       if (response.ok) {
+        messageEl.style.color = "green";
+        messageEl.innerText = result.message;
         document.getElementById("registrationForm").reset();
+      } 
+      // ❌ DUPLICATE / VALIDATION ERROR
+      else {
+        messageEl.style.color = "red";
+        messageEl.innerText = result.message;
       }
+
     } catch (err) {
-      document.getElementById("message").innerText =
-        "Server error. Try again.";
+      console.error(err);
+      messageEl.style.color = "red";
+      messageEl.innerText = "Server error. Please try again.";
     }
   });
