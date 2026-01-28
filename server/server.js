@@ -26,22 +26,19 @@ app.get("/", (req, res) => {
   res.send("Event Registration Backend Running");
 });
 
-// -------- REGISTER (with duplicate prevention) --------
+// -------- REGISTER (NON-BLOCKING EMAIL) --------
 app.post("/register", async (req, res) => {
   try {
     let { name, email, phone, college, event } = req.body;
 
-    // 🔹 Normalize inputs
+    // Normalize inputs
     email = email.toLowerCase().trim();
     const cleanPhone = phone.replace(/\D/g, "").slice(-10);
 
-    // 🔒 Strong duplicate check (email OR phone per event)
+    // Duplicate check (email OR phone per event)
     const existing = await Registration.findOne({
       event,
-      $or: [
-        { email },
-        { phone: cleanPhone }
-      ]
+      $or: [{ email }, { phone: cleanPhone }]
     });
 
     if (existing) {
@@ -50,7 +47,7 @@ app.post("/register", async (req, res) => {
       });
     }
 
-    // 💾 Save registration
+    // Save registration
     await Registration.create({
       name,
       email,
@@ -59,8 +56,13 @@ app.post("/register", async (req, res) => {
       event
     });
 
-    // 📧 Send confirmation email
-    await transporter.sendMail({
+    // ✅ RESPOND IMMEDIATELY (no hanging UI)
+    res.status(201).json({
+      message: "Registration successful"
+    });
+
+    // 📧 Send email in background (NON-BLOCKING)
+    transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
       subject: "Event Registration Confirmation",
@@ -72,10 +74,8 @@ app.post("/register", async (req, res) => {
         <br/>
         <p>Thank you for registering!</p>
       `
-    });
-
-    res.status(201).json({
-      message: "Registration successful. Confirmation email sent."
+    }).catch(err => {
+      console.error("EMAIL FAILED:", err);
     });
 
   } catch (error) {
@@ -87,11 +87,9 @@ app.post("/register", async (req, res) => {
 // -------- ADMIN: VIEW REGISTRATIONS --------
 app.get("/registrations", async (req, res) => {
   try {
-    const registrations = await Registration.find()
-      .sort({ createdAt: -1 });
+    const registrations = await Registration.find().sort({ createdAt: -1 });
     res.json(registrations);
   } catch (error) {
-    console.error("FETCH ERROR:", error);
     res.status(500).json({ message: "Failed to fetch registrations" });
   }
 });
@@ -102,7 +100,6 @@ app.delete("/registrations/:id", async (req, res) => {
     await Registration.findByIdAndDelete(req.params.id);
     res.json({ message: "Registration deleted" });
   } catch (error) {
-    console.error("DELETE ERROR:", error);
     res.status(500).json({ message: "Delete failed" });
   }
 });
@@ -120,9 +117,7 @@ app.get("/registrations/csv", async (req, res) => {
     res.header("Content-Type", "text/csv");
     res.attachment("event_registrations.csv");
     res.send(csv);
-
   } catch (error) {
-    console.error("CSV ERROR:", error);
     res.status(500).send("Failed to generate CSV");
   }
 });
